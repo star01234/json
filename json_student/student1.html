@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Attendance</title>
+    <!-- เรียกใช้ CSS ของ Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mt-5">รายชื่อการเข้าเรียน</h1>
+        <!-- ปรับการวางแนวของช่องค้นหาไปทางด้านขวา -->
+        <div class="row justify-content-end mt-4">
+            <div class="col-md-4">
+                <input type="text" id="searchInput" class="form-control" placeholder="ค้นหานักเรียน...">
+            </div>
+            <div class="col-md-4">
+                <a href="#" class="btn btn-primary" onclick="exportJSONData()">Export JSON</a>
+            </div>
+        </div>
+        <div class="row justify-content-center mt-4">
+            <div class="col-md-4">
+                <input type="text" id="nameInput" class="form-control" placeholder="ชื่อ...">
+            </div>
+            <div class="col-md-4">
+                <input type="text" id="idInput" class="form-control" placeholder="เลขที่...">
+            </div>
+            <div class="col-md-4">
+                <button class="btn btn-primary" onclick="addPerson()">เพิ่ม</button>
+            </div>
+        </div>
+        <table class="table mt-4">
+            <thead>
+                <tr>
+                    <th>ลำดับ</th>
+                    <th>รหัสประจำตัว</th>
+                    <th>ชื่อ</th>
+                    <th>สัปดาห์ 1</th>
+                    <th>สัปดาห์ 2</th>
+                    <th>สัปดาห์ 3</th>
+                    <th>สัปดาห์ 4</th>
+                    <th>สัปดาห์ 5</th>
+                </tr>
+            </thead>
+            <tbody id="attendance-list"></tbody>
+        </table>
+    </div>
+    <script>
+        // ฟังก์ชันโหลดข้อมูลจากไฟล์ JSON และแสดงบนตาราง
+        function loadAttendanceDataFromFile(file) {
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                const jsonData = event.target.result;
+                const data = JSON.parse(jsonData);
+                renderAttendanceData(data);
+            };
+            reader.readAsText(file);
+        }
+
+        // ฟังก์ชันโหลดข้อมูลจากไฟล์ JSON และแสดงบนตาราง
+        function loadAttendanceData() {
+            fetch('student_attendance.json')
+                .then(response => response.json())
+                .then(data => {
+                    renderAttendanceData(data);
+                })
+                .catch(error => console.error('Error loading the data:', error));
+        }
+
+        // ฟังก์ชันอัปเดตการเข้าเรียนของนักเรียนและบันทึกลงใน JSON
+        function toggleAttendanceStatus(checkbox, week, studentIndex) {
+            const checked = checkbox.checked;
+            fetch('student_attendance.json')
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(student => {
+                        if (student['ลำดับ'] === studentIndex) {
+                            student[week] = checked;
+                        }
+                    });
+                    saveAttendanceData(data);
+                })
+                .catch(error => console.error('Error updating the data:', error));
+        }
+        // ฟังก์ชันบันทึกข้อมูลลงในไฟล์ JSON
+        function saveAttendanceData(data) {
+            const jsonData = JSON.stringify(data, null, 2);
+            fetch('save_attendance.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: jsonData
+            })
+                .then(response => response.text())
+                .then(data => console.log(data))
+                .catch(error => console.error('Error saving the data:', error));
+        }
+        // ฟังก์ชันค้นหานักเรียน
+        function searchStudents() {
+            const input = document.getElementById('searchInput');
+            const filter = input.value.toUpperCase();
+            const table = document.getElementById('attendance-list');
+            const rows = table.getElementsByTagName('tr');
+            for (let i = 0; i < rows.length; i++) {
+                const cells = rows[i].getElementsByTagName('td');
+                let found = false;
+                for (let j = 0; j < cells.length && !found; j++) {
+                    const cell = cells[j];
+                    if (cell) {
+                        const textValue = cell.textContent || cell.innerText;
+                        if (textValue.toUpperCase().indexOf(filter) > -1) {
+                            found = true;
+                        }
+                    }
+                }
+                rows[i].style.display = found ? '' : 'none';
+            }
+        }
+        // ฟังก์ชันเพิ่มนักเรียน
+        function addPerson() {
+            const idInput = document.getElementById('idInput');
+            const nameInput = document.getElementById('nameInput');
+            const id = idInput.value;
+            const name = nameInput.value;
+
+            if (!id || !name) {
+                alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+                return;
+            }
+
+            const newRowData = {
+                "ลำดับ": document.getElementById('attendance-list').getElementsByTagName('tr').length + 1, // เพิ่มลำดับใหม่โดยนับจากจำนวนแถวที่มีอยู่แล้วและเพิ่ม 1
+                "รหัสประจำตัว": id,
+                "ชื่อ": name,
+                "สัปดาห์1": false,
+                "สัปดาห์2": false,
+                "สัปดาห์3": false,
+                "สัปดาห์4": false,
+                "สัปดาห์5": false
+            };
+
+            const listContainer = document.getElementById('attendance-list');
+            const newRow = document.createElement('tr');
+            newRow.innerHTML = `
+                <td>${newRowData['ลำดับ']}</td>
+                <td>${id}</td>
+                <td>${name}</td>
+                <td onclick="toggleAttendanceStatus(this.querySelector('input'), 'สัปดาห์1', -1)"><input class="form-check-input" type="checkbox"></td>
+                <td onclick="toggleAttendanceStatus(this.querySelector('input'), 'สัปดาห์2', -1)"><input class="form-check-input" type="checkbox"></td>
+                <td onclick="toggleAttendanceStatus(this.querySelector('input'), 'สัปดาห์3', -1)"><input class="form-check-input" type="checkbox"></td>
+                <td onclick="toggleAttendanceStatus(this.querySelector('input'), 'สัปดาห์4', -1)"><input class="form-check-input" type="checkbox"></td>
+                <td onclick="toggleAttendanceStatus(this.querySelector('input'), 'สัปดาห์5', -1)"><input class="form-check-input" type="checkbox"></td>
+            `;
+            listContainer.appendChild(newRow);
+
+            // Clear input fields
+            idInput.value = '';
+            nameInput.value = '';
+
+            // เพิ่มข้อมูลใหม่ลงใน JSON และบันทึก
+            fetch('student_attendance.json')
+                .then(response => response.json())
+                .then(data => {
+                    data.push(newRowData);
+                    saveAttendanceData(data);
+                })
+                .catch(error => console.error('Error adding new person:', error));
+        }
+        // ฟังก์ชันแสดงข้อมูลการเข้าเรียนบนตาราง
+        function renderAttendanceData(data) {
+            const tableBody = document.getElementById('attendance-list');
+            tableBody.innerHTML = '';
+            data.forEach((student, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${student['ลำดับ']}</td>
+                    <td>${student['รหัสประจำตัว']}</td>
+                    <td>${student['ชื่อ']}</td>
+                    <td><input class="form-check-input" type="checkbox" ${student['สัปดาห์1'] ? 'checked' : ''} onclick="toggleAttendanceStatus(this, 'สัปดาห์1', ${student['ลำดับ']})"></td>
+                    <td><input class="form-check-input" type="checkbox" ${student['สัปดาห์2'] ? 'checked' : ''} onclick="toggleAttendanceStatus(this, 'สัปดาห์2', ${student['ลำดับ']})"></td>
+                    <td><input class="form-check-input" type="checkbox" ${student['สัปดาห์3'] ? 'checked' : ''} onclick="toggleAttendanceStatus(this, 'สัปดาห์3', ${student['ลำดับ']})"></td>
+                    <td><input class="form-check-input" type="checkbox" ${student['สัปดาห์4'] ? 'checked' : ''} onclick="toggleAttendanceStatus(this, 'สัปดาห์4', ${student['ลำดับ']})"></td>
+                    <td><input class="form-check-input" type="checkbox" ${student['สัปดาห์5'] ? 'checked' : ''} onclick="toggleAttendanceStatus(this, 'สัปดาห์5', ${student['ลำดับ']})"></td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+        function exportJSONData() {
+            const table = document.getElementById('attendance-list');
+            const rows = table.getElementsByTagName('tr');
+            const data = [];
+
+            // เริ่มต้นที่ดัชนี 1 เพื่อข้ามแถวหัวตาราง
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                const cells = row.getElementsByTagName('td');
+                const rowData = {
+                    'รหัสประจำตัว': cells[1].textContent, // เนื่องจากแถวแรกเป็นหัวตาราง ดังนั้นเราใช้ index 1 สำหรับรหัสประจำตัว
+                    'ชื่อ': cells[2].textContent,
+                    'สัปดาห์ที่ 1': cells[3].getElementsByTagName('input')[0].checked,
+                    'สัปดาห์ที่ 2': cells[4].getElementsByTagName('input')[0].checked,
+                    'สัปดาห์ที่ 3': cells[5].getElementsByTagName('input')[0].checked,
+                    'สัปดาห์ที่ 4': cells[6].getElementsByTagName('input')[0].checked,
+                    'สัปดาห์ที่ 5': cells[7].getElementsByTagName('input')[0].checked
+                };
+                data.push(rowData);
+            }
+
+            // แปลงข้อมูลเป็น JSON string
+            const jsonData = JSON.stringify(data, null, 2);
+
+            // สร้าง Blob
+            const blob = new Blob([jsonData], { type: 'application/json' });
+
+            // สร้าง Element ลิงก์สำหรับดาวน์โหลดไฟล์ JSON
+            const a = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            a.href = url;
+            a.download = 'student_attendance_export.json';
+
+            // เพิ่ม Element ลิงก์ไปยัง DOM และเรียกคลิก
+            document.body.appendChild(a);
+            a.click();
+
+            // ลบ Element ลิงก์ออกจาก DOM
+            document.body.removeChild(a);
+
+            // ปลด URL object
+            URL.revokeObjectURL(url);
+        }
+
+
+        document.getElementById('searchInput').addEventListener('input', searchStudents);
+
+        // เรียกใช้ฟังก์ชันเมื่อหน้าเว็บโหลดเสร็จสมบูรณ์
+        window.onload = loadAttendanceData;
+    </script>
+
+</body>
+
+</html>
